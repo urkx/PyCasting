@@ -2,6 +2,11 @@ from typing import cast
 import numpy as np
 import math
 
+class Light:
+    def __init__(self, position, intensity):
+        self.position = position
+        self.intensity = intensity
+
 class Material:
     def __init__(self, color):
         self.color = color
@@ -37,7 +42,7 @@ class Sphere:
 
 def scene_intersect(orig, dir, spheres, hit, N, material):
     sphere_dist = 9999.999999
-    res = [False, np.zeros(3), np.zeros(3)]
+    res = [False, np.zeros(3), np.zeros(3), np.zeros(3)]
     dist_i = 0
     for sphere in spheres:
         res2 = sphere.ray_intersect(orig, dir, dist_i)
@@ -47,11 +52,12 @@ def scene_intersect(orig, dir, spheres, hit, N, material):
             N_aux = np.subtract(hit, sphere.center)
             res[1] = N_aux / np.linalg.norm(N_aux)
             res[2] = sphere.material.color
+            res[3] = hit
         dist_i = res2[1]
     res[0] = sphere_dist < 1000 
     return res
 
-def cast_ray(orig, dir, spheres):
+def cast_ray(orig, dir, spheres, lights):
     point = np.zeros(3)
     N = np.zeros(3)
     material = Material(np.zeros(3))
@@ -60,10 +66,18 @@ def cast_ray(orig, dir, spheres):
 
     if res[0] is False:
         return np.array([128, 152, 242])
-        
-    return res[2]
+    
+    light_intensity = 0
+    for light in lights:
+        light_dir = np.subtract(light.position, res[3])
+        light_dir_aux = np.linalg.norm(light_dir)
+        light_dir = light_dir/light_dir_aux
+        light_intensity += light.intensity * max(0, np.dot(light_dir, res[1]))
 
-def render(spheres):
+    return res[2] * light_intensity
+    
+
+def render(spheres, lights):
     WIDTH = 1024
     HEIGHT = 768
     framebuffer = np.zeros((WIDTH*HEIGHT, 3), dtype=np.ubyte)
@@ -77,7 +91,7 @@ def render(spheres):
             y = -(2*(j + 0.5)/HEIGHT - 1)*math.tan(40/2.)
             dir = np.array([x,y,-1])
             dirNorm = np.linalg.norm(dir)
-            res = cast_ray(np.zeros(3), dir/dirNorm, spheres)
+            res = cast_ray(np.zeros(3), dir/dirNorm, spheres, lights)
             framebuffer[i+j*WIDTH][0] = res[0]
             framebuffer[i+j*WIDTH][1] = res[1]
             framebuffer[i+j*WIDTH][2] = res[2]
@@ -93,7 +107,10 @@ def render(spheres):
 if __name__ == "__main__":
     material_rojo = Material(np.array([95, 11, 43]))
     material_marron = Material(np.array([101, 91, 85]))
+    light1 = Light(np.array([-20, 20, 20]), 1.5)
+    light2 = Light(np.array([10, 10, 10]), 0.9)
     sphere1 =  Sphere(np.array([-6, 0, -10]), 2, material_marron)
     sphere2 = Sphere(np.array([-4, 0, -12]), 3, material_rojo)
     spheres = [sphere1, sphere2]
-    render(spheres)
+    lights = [light1, light2]
+    render(spheres, lights)
